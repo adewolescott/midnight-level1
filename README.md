@@ -40,4 +40,15 @@ npx vitest run
 **Hidden Order Dark Pool DEX:** Inspired by Midnight's focus on institutional finance and data protection, this dApp establishes a private order-book exchange where trader volumes, strategies, and order sizes remain completely hidden prior to settlement. By utilizing Zero-Knowledge proofs for execution fairness, it prevents front-running and MEV exposure while giving institutions the confidence to trade on-chain with compliance-ready audit trails.
 
 ## Screenshots
-<!-- Attach 2 screenshots here before submitting: 1) compact compile output 2) deployed contract address -->
+<!-- (1) compact compile output -->
+## Compact Compile Output
+<img width="1920" height="1043" alt="compilation-output" src="https://github.com/user-attachments/assets/fd60acc6-f79b-47db-8231-159905503adc" />
+
+
+
+
+<!-- (2) deployed contract address -->
+## Deployed Contract Address
+<img width="1920" height="1052" alt="deployed-contract-address" src="https://github.com/user-attachments/assets/4aad3893-4456-4c4e-87b9-aa18dc572421" />
+
+
