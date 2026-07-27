@@ -1,0 +1,20 @@
+// ============================================================================
+// CONTRACT: Secret Counter
+// PRIVACY MODEL:
+// - PUBLIC STATE: `counter` (Counter) - On-chain counter state.
+// - PRIVATE WITNESS: `secretKey` (Bytes<32>) - Stored locally, never published.
+// - DISCLOSE CONTROL: Uses disclose() on commitment verification.
+// ============================================================================
+
+pragma language_version >= 0.20;
+
+import CompactStandardLibrary;
+
+export ledger counter: Counter;
+
+export circuit incrementWithSecret(secretKey: Bytes<32>, expectedCommitment: Bytes<32>): [] {
+    const computedCommitment = persistentHash<Bytes<32>>(secretKey);
+    const isValid = disclose(computedCommitment == expectedCommitment);
+    assert(isValid, "Invalid secret key");
+    counter.increment(1);
+}
