@@ -21,19 +21,56 @@ export function useLaceWallet() {
     setWalletState((prev) => ({ ...prev, isConnecting: true, error: null }));
 
     try {
-      const midnightApi = (window as any).midnight?.mnLace;
+      const midnightObj = (window as any).midnight;
 
-      if (!midnightApi) {
-        throw new Error('Lace Wallet extension not detected in window.midnight.mnLace. Ensure Lace is enabled on Preprod.');
+      // 1. Check if the root window.midnight object exists
+      if (!midnightObj) {
+        throw new Error(
+          'No Midnight wallet extension detected on window.midnight. Please ensure your Lace Midnight extension is installed and active on this tab.'
+        );
       }
 
-      // Check authorization or request enable
-      const isEnabled = await midnightApi.isEnabled?.();
-      const walletConnector = isEnabled ? await midnightApi.enable() : await midnightApi.enable();
+      // 2. Dynamic wallet detection (check legacy mnLace or enumerate UUID keys)
+      let initialApi = midnightObj.mnLace;
+
+      if (!initialApi) {
+        const availableWallets = Object.values(midnightObj);
+        if (availableWallets.length > 0) {
+          initialApi = availableWallets[0];
+        }
+      }
+
+      if (!initialApi) {
+        throw new Error('Midnight wallet extension object found, but no initial API connector is exposed.');
+      }
+
+      // 3. Connect to network (Preprod)
+      let connectedApi;
+      if (typeof initialApi.connect === 'function') {
+        connectedApi = await initialApi.connect('preprod');
+      } else if (typeof initialApi.enable === 'function') {
+        connectedApi = await initialApi.enable();
+      } else {
+        throw new Error('Selected Midnight wallet does not expose a connect() or enable() method.');
+      }
+
+      // 4. Retrieve address safely
+      let walletAddress = 'mn_preprod1_lace_connected';
+      try {
+        if (typeof connectedApi?.getUnshieldedAddress === 'function') {
+          const { unshieldedAddress } = await connectedApi.getUnshieldedAddress();
+          if (unshieldedAddress) walletAddress = unshieldedAddress;
+        } else if (typeof connectedApi?.state === 'function') {
+          const state = await connectedApi.state();
+          if (state?.address) walletAddress = state.address;
+        }
+      } catch (addrErr) {
+        console.warn('Could not fetch exact address, using default connected state:', addrErr);
+      }
 
       setWalletState({
         isConnected: true,
-        address: walletConnector?.address || 'mn_preprod1_lace_connected',
+        address: walletAddress,
         isConnecting: false,
         error: null,
       });
