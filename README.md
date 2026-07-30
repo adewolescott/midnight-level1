@@ -52,3 +52,47 @@ npx vitest run
 <img width="1920" height="1052" alt="deployed-contract-address" src="https://github.com/user-attachments/assets/4aad3893-4456-4c4e-87b9-aa18dc572421" />
 
 
+## Level 2.
+# Midnight Private Counter — Level 2 (Waxing Crescent)
+
+A privacy-preserving dApp interface built on the Midnight Preprod Testnet, connecting the Lace Wallet to execute Zero-Knowledge circuit proofs locally inside the browser.
+
+---
+
+## 🔗 Submission Links & Details
+
+| Field | Details |
+| :--- | :--- |
+| **Public GitHub Repository** | https://github.com/adewolescott/midnight-level1 |
+| **Live Demo Link** | https://midnight-level1.vercel.app/ |
+| **Preprod Contract Address** | 6f678977ce5a7fbe124870356149edabcf99e43e4b8d593953227988eb877e94 |
+| **Demo Video Link** | https://youtu.be/8XVoEnDSNJk?si=z6Rq9P8sRlLv-F2D |
+
+---
+
+## 🛡️ Privacy Claim & Observable Behavior
+
+### Privacy Guarantee
+The application maintains an on-chain public state counter (`counter`) that increments only upon successful zero-knowledge authorization.
+
+- **WHAT STAYS PRIVATE (Local Witness):** The user's `secretKey` (`Bytes<32>`). It is processed exclusively within the local browser environment via Midnight's proof engine. It is never transmitted across the network or stored on-chain.
+- **WHAT IS PUBLIC (On-Chain State):** The updated `counter` state on the public ledger.
+- **OBSERVABLE BEHAVIOR:** Third parties can verify that an authorized state update occurred on-chain without ever seeing, inspecting, or reconstructing the caller's private secret key.
+
+---
+
+## 🖥️ Frontend Overview & Setup
+
+The frontend is a **Next.js (App Router)** web application located in the `/frontend` directory.
+
+### Tech Stack
+- **Framework:** Next.js, Tailwind CSS, TypeScript
+- **Wallet Connector:** Lace Wallet DApp Connector API (`mnLace`)
+- **SDK:** `@midnight-ntwrk/midnight-js-contracts`
+- **Deployment:** Vercel
+
+### Running the Frontend Locally
+
+1. **Navigate to the frontend folder:**
+   ```bash
+   cd frontend
