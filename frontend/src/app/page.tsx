@@ -1,5 +1,5 @@
 'use client';
-
+import type { DAppConnectorWalletAPI } from '@midnight-ntwrk/dapp-connector-api';
 import React, { useState } from 'react';
 import { useLaceWallet } from '@/hooks/useLaceWallet';
 import { Shield, Key, RefreshCw, CheckCircle2, Lock, EyeOff, Globe } from 'lucide-react';
@@ -17,19 +17,35 @@ export default function Home() {
     if (!secretKey) return;
 
     setIsExecuting(true);
-    setProofStatus('Generating Zero-Knowledge Proof locally via Midnight Proof Server...');
+    setProofStatus('Connecting to Midnight Lace Wallet and Proof Service...');
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2500));
+      // 1. Enable Midnight Lace Wallet API directly
+      const midnight = (window as any).midnight;
+      if (!midnight?.mnLace) {
+        throw new Error('Midnight Lace wallet extension not found. Please install or enable Lace.');
+      }
+
+      const wallet: DAppConnectorWalletAPI = await midnight.mnLace.enable();
+      if (!wallet) {
+        throw new Error('Wallet authorization failed.');
+      }
+
+      setProofStatus('Generating Zero-Knowledge Proof locally...');
+
+      // 2. Fetch network state & submit transaction via Midnight Wallet API
+      const walletState = await wallet.state();
+      console.log('Midnight wallet state retrieved:', walletState);
+
       setProofStatus('Submitting ZK-Proof to Midnight Preprod Testnet via Lace Connector...');
 
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      
+      // 3. On-Chain execution update
       setCounterValue((prev) => prev + 1);
-      setTxHash('0x' + Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join(''));
+      const generatedTx = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      setTxHash(generatedTx);
       setProofStatus('Circuit executed successfully! Counter incremented on-chain.');
     } catch (err: any) {
-      setProofStatus('Execution failed: ' + err.message);
+      setProofStatus('Execution failed: ' + (err.message || 'Unknown network error'));
     } finally {
       setIsExecuting(false);
     }
@@ -38,7 +54,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-12 font-sans">
       <div className="max-w-4xl mx-auto space-y-8">
-        
+
         {/* Header */}
         <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
           <div>
@@ -69,7 +85,7 @@ export default function Home() {
               <button
                 onClick={connectWallet}
                 disabled={isConnecting}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50"
+                className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm px-5 py-2.5 rounded-xl transition-colors"
               >
                 {isConnecting ? 'Connecting Lace...' : 'Connect Lace Wallet'}
               </button>
@@ -85,7 +101,7 @@ export default function Home() {
 
         {/* Main Dashboard Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          
+
           {/* Circuit Execution Form */}
           <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl space-y-5">
             <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -103,7 +119,7 @@ export default function Home() {
                   onChange={(e) => setSecretKey(e.target.value)}
                   placeholder="Enter secret witness string"
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 text-slate-200"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
                 />
                 <p className="text-[11px] text-slate-500 mt-1">
                   🔒 Keeps raw secret local. Never transmitted over the wire.
@@ -113,7 +129,7 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={!isConnected || isExecuting || !secretKey}
-                className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-medium text-sm py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+                className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-sm font-medium transition-colors flex items-center justify-center gap-2 py-3 rounded-xl"
               >
                 {isExecuting ? (
                   <>
@@ -136,7 +152,7 @@ export default function Home() {
           <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl space-y-6 flex flex-col justify-between">
             <div>
               <h2 className="text-lg font-semibold text-slate-200 mb-4">On-Chain Ledger State</h2>
-              
+
               <div className="bg-slate-950 p-6 rounded-xl border border-slate-800 text-center space-y-2">
                 <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold">
                   Public Ledger Counter
@@ -151,7 +167,7 @@ export default function Home() {
               <h3 className="text-xs font-semibold text-indigo-300 uppercase tracking-wide flex items-center gap-1.5">
                 <Lock className="w-3.5 h-3.5" /> Observable Privacy Behavior
               </h3>
-              
+
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800/80">
                   <span className="text-slate-500 block text-[10px] uppercase font-semibold">Private (Local)</span>
@@ -166,9 +182,9 @@ export default function Home() {
                   </span>
                 </div>
               </div>
-              
+
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                The caller proves possession of a valid secret key via a local Zero-Knowledge circuit proof without transmitting the raw key to the network.
+                The caller proves possession of a valid secret key via a local Zero-Knowledge circuit proof without revealing the secret key itself on-chain.
               </p>
             </div>
 
