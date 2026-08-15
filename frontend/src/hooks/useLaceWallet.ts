@@ -1,101 +1,70 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-
-export interface WalletState {
-  isConnected: boolean;
-  address: string | null;
-  isConnecting: boolean;
-  error: string | null;
-}
+import { useState, useEffect, useCallback } from 'react';
+import type { DAppConnectorWalletAPI } from '@midnight-ntwrk/dapp-connector-api';
 
 export function useLaceWallet() {
-  const [walletState, setWalletState] = useState<WalletState>({
-    isConnected: false,
-    address: null,
-    isConnecting: false,
-    error: null,
-  });
+  const [walletApi, setWalletApi] = useState<DAppConnectorWalletAPI | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const connectWallet = useCallback(async () => {
-    setWalletState((prev) => ({ ...prev, isConnecting: true, error: null }));
-
+  const checkConnection = useCallback(async () => {
     try {
-      const midnightObj = (window as any).midnight;
-
-      // 1. Check if the root window.midnight object exists
-      if (!midnightObj) {
-        throw new Error(
-          'No Midnight wallet extension detected on window.midnight. Please ensure your Lace Midnight extension is installed and active on this tab.'
-        );
-      }
-
-      // 2. Dynamic wallet detection (check legacy mnLace or enumerate UUID keys)
-      let initialApi = midnightObj.mnLace;
-
-      if (!initialApi) {
-        const availableWallets = Object.values(midnightObj);
-        if (availableWallets.length > 0) {
-          initialApi = availableWallets[0];
+      const midnight = (window as any).midnight;
+      if (midnight?.mnLace) {
+        const isAuth = await midnight.mnLace.isEnabled?.();
+        if (isAuth) {
+          const api: DAppConnectorWalletAPI = await midnight.mnLace.enable();
+          setWalletApi(api);
+          const state: any = await api.state();
+          setAddress(state.address || state.shieldedAddress || 'addr_midnight_preprod_connected');
+          setIsConnected(true);
         }
       }
-
-      if (!initialApi) {
-        throw new Error('Midnight wallet extension object found, but no initial API connector is exposed.');
-      }
-
-      // 3. Connect to network (Preprod)
-      let connectedApi;
-      if (typeof initialApi.connect === 'function') {
-        connectedApi = await initialApi.connect('preprod');
-      } else if (typeof initialApi.enable === 'function') {
-        connectedApi = await initialApi.enable();
-      } else {
-        throw new Error('Selected Midnight wallet does not expose a connect() or enable() method.');
-      }
-
-      // 4. Retrieve address safely
-      let walletAddress = 'mn_preprod1_lace_connected';
-      try {
-        if (typeof connectedApi?.getUnshieldedAddress === 'function') {
-          const { unshieldedAddress } = await connectedApi.getUnshieldedAddress();
-          if (unshieldedAddress) walletAddress = unshieldedAddress;
-        } else if (typeof connectedApi?.state === 'function') {
-          const state = await connectedApi.state();
-          if (state?.address) walletAddress = state.address;
-        }
-      } catch (addrErr) {
-        console.warn('Could not fetch exact address, using default connected state:', addrErr);
-      }
-
-      setWalletState({
-        isConnected: true,
-        address: walletAddress,
-        isConnecting: false,
-        error: null,
-      });
     } catch (err: any) {
-      setWalletState({
-        isConnected: false,
-        address: null,
-        isConnecting: false,
-        error: err.message || 'Failed to connect Lace Wallet',
-      });
+      console.warn('Silent wallet check skipped:', err.message);
     }
   }, []);
 
-  const disconnectWallet = useCallback(() => {
-    setWalletState({
-      isConnected: false,
-      address: null,
-      isConnecting: false,
-      error: null,
-    });
-  }, []);
+  useEffect(() => {
+    checkConnection();
+  }, [checkConnection]);
+
+  const connectWallet = async () => {
+    setIsConnecting(true);
+    setError(null);
+    try {
+      const midnight = (window as any).midnight;
+      if (!midnight?.mnLace) {
+        throw new Error('Midnight Lace wallet extension not detected. Please install and switch to Midnight Preprod.');
+      }
+      const api: DAppConnectorWalletAPI = await midnight.mnLace.enable();
+      setWalletApi(api);
+      const state: any = await api.state();
+      setAddress(state.address || state.shieldedAddress || 'addr_midnight_preprod_user');
+      setIsConnected(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect to Midnight Lace.');
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const disconnectWallet = () => {
+    setWalletApi(null);
+    setAddress(null);
+    setIsConnected(false);
+  };
 
   return {
-    ...walletState,
+    walletApi,
+    address,
+    isConnected,
+    isConnecting,
+    error,
     connectWallet,
-    disconnectWallet,
+    disconnectWallet
   };
 }

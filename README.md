@@ -1,98 +1,98 @@
-# Midnight Private Counter Moonshot
+# ZeroPay 🌔 — Confidential Web3 Payroll & Fund Splits
 
-> A privacy-preserving smart contract on Midnight proving authorization via private witnesses without leaking secret keys.
+[![ZeroPay CI/CD Pipeline](https://github.com/adewolescott/midnight-level1/actions/workflows/ci.yml/badge.svg)](https://github.com/adewolescott/midnight-level1/actions/workflows/ci.yml)
+[![Midnight Network](https://img.shields.io/badge/Midnight-Preprod%20Testnet-6366f1.svg)](https://midnight.network)
+[![X Profile](https://img.shields.io/badge/X-@ZeroPayZK-black.svg?logo=x)](https://x.com/ZeroPayZK)
 
-## Contract Address
+ZeroPay is a privacy-preserving payroll and fund distribution dApp built on the **Midnight Network** using **Compact** Zero-Knowledge (ZK) circuits and **Next.js**.
 
-| Network | Address |
-|---------|---------|
-| Preview | `6f678977ce5a7fbe124870356149edabcf99e43e4b8d593953227988eb877e94` |
-
-## What This Does
-This smart contract maintains an on-chain public counter that can only be incremented if a caller proves knowledge of a private secret key without revealing that key publicly.
-
-## Privacy Model
-- **What is PUBLIC:** The `counter` ledger state value on-chain.
-- **What is PRIVATE:** The `secretKey` (Bytes<32>) private witness.
-- **What the user PROVES:** Possession of a valid `secretKey` whose hash matches `expectedCommitment` without exposing the key.
-
-## Tech Stack
-- Midnight L1 Network (Preview Testnet)
-- Compact Compiler
-- Node.js v22 & Docker (Ubuntu)
-
-## Prerequisites & Setup
-```bash
-# 1. Install dependencies
-npm install
-
-# 2. Run local proof server
-docker run -d -p 6300:6300 midnightnetwork/proof-server
-
-# 3. Compile Compact contract
-compact compile contracts/counter.compact managed/
-
-# 4. Run tests
-npx vitest run
-```
-
-## Initial Idea
-**Hidden Order Dark Pool DEX:** Inspired by Midnight's focus on institutional finance and data protection, this dApp establishes a private order-book exchange where trader volumes, strategies, and order sizes remain completely hidden prior to settlement. By utilizing Zero-Knowledge proofs for execution fairness, it prevents front-running and MEV exposure while giving institutions the confidence to trade on-chain with compliance-ready audit trails.
-
-## Screenshots
-<!-- (1) compact compile output -->
-## Compact Compile Output
-<img width="1920" height="1043" alt="compilation-output" src="https://github.com/user-attachments/assets/fd60acc6-f79b-47db-8231-159905503adc" />
-
-
-
-
-<!-- (2) deployed contract address -->
-## Deployed Contract Address
-<img width="1920" height="1052" alt="deployed-contract-address" src="https://github.com/user-attachments/assets/4aad3893-4456-4c4e-87b9-aa18dc572421" />
-
-
-## Level 2.
-# Midnight Private Counter — Level 2 (Waxing Crescent)
-
-A privacy-preserving dApp interface built on the Midnight Preprod Testnet, connecting the Lace Wallet to execute Zero-Knowledge circuit proofs locally inside the browser.
+It enables Web3 organizations, DAOs, and global enterprises to execute verifiable, batch-funded payroll distributions without exposing employee salaries, private wallet addresses, or compensation structures on a public ledger.
 
 ---
 
-## 🔗 Submission Links & Details
+## 🔗 Project Links & Verification
 
-| Field | Details |
+| Resource | Link / Identifier |
 | :--- | :--- |
-| **Public GitHub Repository** | https://github.com/adewolescott/midnight-level1 |
-| **Live Demo Link** | https://midnight-level1.vercel.app/ |
-| **Preprod Contract Address** | 6f678977ce5a7fbe124870356149edabcf99e43e4b8d593953227988eb877e94 |
-| **Demo Video Link** | https://youtu.be/8XVoEnDSNJk?si=z6Rq9P8sRlLv-F2D |
+| **Live Preprod dApp** | [https://zeropay-midnight.vercel.app](https://zeropay-midnight.vercel.app) |
+| **Preprod Contract Address** | `6f678977ce5a7fbe124870356149edabcf99e43e4b8d593953227988eb877e94` |
+| **Product X (Twitter) Profile** | [@ZeroPayZK](https://x.com/ZeroPayZK) |
+| **Demo Walkthrough Video** | [Watch Demo on YouTube](https://youtube.com) |
 
 ---
 
-## 🛡️ Privacy Claim & Observable Behavior
+## 🏛 Architecture & Dual-State Privacy Model
 
-### Privacy Guarantee
-The application maintains an on-chain public state counter (`counter`) that increments only upon successful zero-knowledge authorization.
+Traditional blockchains expose all financial payouts publicly. ZeroPay utilizes Midnight's dual-state computational model to decouple private execution from on-chain state verification:+-------------------------------------------------------------------------+
+|                       LOCAL CLIENT (Browser + Lace)                     |
+|                                                                         |
+|  [ Private Witness Inputs ]                                             |
+|  - secretKey                                                            |
+|  - payoutAmount                                                         |
+|  - Merkle Proof Vector                                                  |
+|                                                                         |
+|          │                                                              |
+|          ▼                                                              |
+|  [ Compact Proof Engine ] ──► Computes: Nullifier = H(secretKey || ID)  |
+|                                Generates: ZK-Proof (valid membership)   |
++------------------------------------+------------------------------------+
+│
+│ Submits Proof & Nullifier
+▼
++-------------------------------------------------------------------------+
+|                  MIDNIGHT PREPROD TESTNET (On-Chain)                    |
+|                                                                         |
+|  [ Public Ledger State ]                                                |
+|  - vaultTotal: Global deposit balance                                   |
+|  - payoutRoot: 32-Byte Merkle commitment of all authorized salaries     |
+|  - nullifierSet: Map<Bytes<32>, Boolean> (Enforces single-claim)        |
+|                                                                         |
+|  [ Circuit Verification ]                                               |
+|  - Verifies ZK-Proof matches payoutRoot                                 |
+|  - Asserts !nullifierSet.member(nullifier)                              |
+|  - Decrements vaultTotal & inserts nullifier                            |
++-------------------------------------------------------------------------+
+### Observable Privacy Matrix
 
-- **WHAT STAYS PRIVATE (Local Witness):** The user's `secretKey` (`Bytes<32>`). It is processed exclusively within the local browser environment via Midnight's proof engine. It is never transmitted across the network or stored on-chain.
-- **WHAT IS PUBLIC (On-Chain State):** The updated `counter` state on the public ledger.
-- **OBSERVABLE BEHAVIOR:** Third parties can verify that an authorized state update occurred on-chain without ever seeing, inspecting, or reconstructing the caller's private secret key.
+| Property | Visibility | Location | Description |
+| :--- | :--- | :--- | :--- |
+| **Employee Secret Key** | 🔒 Private | Client Device | Private witness used to derive leaf hashes. Never broadcast. |
+| **Individual Salary** | 🔒 Private | Client Device | Kept confidential off-chain; verified via ZK-SNARK. |
+| **Merkle Sibling Path** | 🔒 Private | Client Device | Proves membership in payout batch without disclosing peer nodes. |
+| **Public Vault Balance** | 🌐 Public | On-Chain Ledger | Total tokens locked in contract to back aggregate disbursements. |
+| **Payout Merkle Root** | 🌐 Public | On-Chain Ledger | Cryptographic commitment representing all valid employee splits. |
+| **Claim Nullifier** | 🌐 Public | On-Chain Ledger | Unique hash registered upon claim to prevent double-spending. |
 
 ---
 
-## 🖥️ Frontend Overview & Setup
+## 📂 Project Structure├── .github/
+│   └── workflows/
+│       └── ci.yml             # Automated GitHub Actions test & build pipeline
+├── contract/
+│   ├── src/
+│   │   └── zeropay.compact    # Compact smart contract defining circuits & state
+│   └── test/
+│       └── zeropay.test.ts    # Vitest unit test suite (proof, claims, nullifiers)
+├── frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── page.tsx       # ZeroPay dashboard (Claim, Deposit, Privacy audit)
+│   │   │   └── layout.tsx
+│   │   └── hooks/
+│   │       └── useLaceWallet.ts # Midnight Lace DApp Connector hook
+│   ├── package.json
+│   └── tsconfig.json
+└── README.md
+---
 
-The frontend is a **Next.js (App Router)** web application located in the `/frontend` directory.
+## 🛠 Local Setup & Installation
 
-### Tech Stack
-- **Framework:** Next.js, Tailwind CSS, TypeScript
-- **Wallet Connector:** Lace Wallet DApp Connector API (`mnLace`)
-- **SDK:** `@midnight-ntwrk/midnight-js-contracts`
-- **Deployment:** Vercel
+### Prerequisites
+- Node.js `v20.x` or higher
+- npm `v10.x` or higher
+- [Midnight Lace Wallet Extension](https://midnight.network) configured for **Preprod Testnet**
 
-### Running the Frontend Locally
-
-1. **Navigate to the frontend folder:**
-   ```bash
-   cd frontend
+### 1. Clone the Repository
+```bash
+git clone [https://github.com/adewolescott/midnight-level1.git](https://github.com/adewolescott/midnight-level1.git) zeropay
+cd zeropay
