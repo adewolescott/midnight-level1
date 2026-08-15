@@ -24,7 +24,7 @@ It enables Web3 organizations, DAOs, and global enterprises to execute verifiabl
 ## 🏛 Architecture & Dual-State Privacy Model
 
 Traditional blockchains expose all financial payouts publicly. ZeroPay utilizes Midnight's dual-state computational model to decouple private execution from on-chain state verification:
-
+```
 +-------------------------------------------------------------------------+
 |                       LOCAL CLIENT (Browser + Lace)                     |
 |                                                                         |
@@ -54,7 +54,7 @@ Traditional blockchains expose all financial payouts publicly. ZeroPay utilizes 
 |  - Asserts !nullifierSet.member(nullifier)                              |
 |  - Decrements vaultTotal & inserts nullifier                            |
 +-------------------------------------------------------------------------+
-
+```
 ### Observable Privacy Matrix
 
 | Property | Visibility | Location | Description |
@@ -70,6 +70,7 @@ Traditional blockchains expose all financial payouts publicly. ZeroPay utilizes 
 
 ## 📂 Project Structure
 
+```
 ├── .github/
 │   └── workflows/
 │       └── ci.yml             # Automated GitHub Actions test & build pipeline
@@ -89,6 +90,7 @@ Traditional blockchains expose all financial payouts publicly. ZeroPay utilizes 
 │   ├── package.json
 │   └── tsconfig.json
 └── README.md
+```
 
 ---
 
