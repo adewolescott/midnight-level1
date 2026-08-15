@@ -130,13 +130,13 @@ The contract test suite (contract/test/zeropay.test.ts) verifies the following o
 
 ---
 
-## 📜 Smart Contract Circuits (zeropay.compact)
+## 📜 Smart Contract Circuits (`zeropay.compact`)
 
-* depositPayroll(depositAmount: Uint<64>, newPayoutRoot: Bytes<32>): Void
-  Locks batch payroll funds into vaultTotal and updates the active payoutRoot.
+* **`depositPayroll(depositAmount: Uint<64>, newPayoutRoot: Bytes<32>): Void`**  
+  Locks batch payroll funds into `vaultTotal` and updates the active `payoutRoot`.
 
-* claimPayout(publicNullifier: Bytes<32>, payoutAmount: Uint<64>, witness secretKey: Bytes<32>, witness proof: Vector<4, Bytes<32>>, witness indices: Vector<4, Boolean>): Void
-  Verifies the private witness proof against payoutRoot, writes publicNullifier to nullifierSet, and debits payoutAmount from vaultTotal.
+* **`claimPayout(publicNullifier: Bytes<32>, payoutAmount: Uint<64>, witness secretKey: Bytes<32>, witness proof: Vector<4, Bytes<32>>, witness indices: Vector<4, Boolean>): Void`**  
+  Verifies the private witness proof against `payoutRoot`, writes `publicNullifier` to `nullifierSet`, and debits `payoutAmount` from `vaultTotal`.
 
 ---
 
