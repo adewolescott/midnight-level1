@@ -1,0 +1,72 @@
+include "std";
+
+// Exported ledger state for ZeroPay
+export ledger vaultTotal: Uint<64>;
+export ledger payoutRoot: Bytes<32>;
+export ledger nullifierSet: Map<Bytes<32>, Boolean>;
+
+// Helper to compute recipient leaf hash: H(secretKey || amount)
+circuit computeLeaf(secretKey: Bytes<32>, amount: Uint<64>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([
+    secretKey,
+    pad(32, "left", 0, amount as Bytes<8>)
+  ]);
+}
+
+// Helper to verify Merkle membership proof against the public payoutRoot
+circuit verifyMerkleMembership(
+  leaf: Bytes<32>,
+  proof: Vector<4, Bytes<32>>,
+  indices: Vector<4, Boolean>,
+  expectedRoot: Bytes<32>
+): Boolean {
+  let mut currentHash = leaf;
+
+  for i in 0..4 {
+    let sibling = proof[i];
+    let isRight = indices[i];
+
+    if (isRight) {
+      currentHash = persistentHash<Vector<2, Bytes<32>>>([sibling, currentHash]);
+    } else {
+      currentHash = persistentHash<Vector<2, Bytes<32>>>([currentHash, sibling]);
+    }
+  }
+
+  return currentHash == expectedRoot;
+}
+
+// Circuit: Employer deposits batch funds and updates the authorized Merkle root
+export circuit depositPayroll(
+  depositAmount: Uint<64>,
+  newPayoutRoot: Bytes<32>
+): Void {
+  assert depositAmount > 0 "ZeroPay: Deposit amount must be greater than zero";
+  
+  vaultTotal = vaultTotal + depositAmount;
+  payoutRoot = newPayoutRoot;
+}
+
+// Circuit: Employee claims confidential payout using a private witness
+export circuit claimPayout(
+  publicNullifier: Bytes<32>,
+  payoutAmount: Uint<64>,
+  witness secretKey: Bytes<32>,
+  witness proof: Vector<4, Bytes<32>>,
+  witness indices: Vector<4, Boolean>
+): Void {
+  // 1. Enforce vault solvency
+  assert vaultTotal >= payoutAmount "ZeroPay: Insufficient vault funds";
+
+  // 2. Prevent double payouts via public nullifier tracking
+  assert !nullifierSet.member(publicNullifier) "ZeroPay: Payout has already been claimed";
+
+  // 3. Reconstruct leaf and verify membership in payoutRoot
+  let leaf = computeLeaf(secretKey, payoutAmount);
+  let isValidMember = verifyMerkleMembership(leaf, proof, indices, payoutRoot);
+  assert isValidMember "ZeroPay: Invalid private witness or Merkle proof";
+
+  // 4. Nullify claim and debit vault balance
+  nullifierSet.insert(publicNullifier, true);
+  vaultTotal = vaultTotal - payoutAmount;
+}
