@@ -4,7 +4,7 @@
 [![Midnight Network](https://img.shields.io/badge/Midnight-Preprod%20Testnet-6366f1.svg)](https://midnight.network)
 [![X Profile](https://img.shields.io/badge/X-@ZeroPayZK-black.svg?logo=x)](https://x.com/ZeroPayZK)
 
-ZeroPay is a privacy-preserving payroll and fund distribution dApp built on the Midnight Network using Compact Zero-Knowledge (ZK) circuits and Next.js.
+ZeroPay is a privacy-preserving payroll and fund distribution dApp built on the **Midnight Network** using **Compact** Zero-Knowledge (ZK) circuits and **Next.js**.
 
 It enables Web3 organizations, DAOs, and global enterprises to execute verifiable, batch-funded payroll distributions without exposing employee salaries, private wallet addresses, or compensation structures on a public ledger.
 
@@ -15,8 +15,8 @@ It enables Web3 organizations, DAOs, and global enterprises to execute verifiabl
 | Resource | Link / Identifier |
 | :--- | :--- |
 | **Live Preprod dApp** | https://zeropay-midnight.vercel.app |
-| **Preprod Contract Address** | 6f678977ce5a7fbe124870356149edabcf99e43e4b8d593953227988eb877e94 |
-| **Product X (Twitter) Profile** | @ZeroPayZK |
+| **Preprod Contract Address** | `6f678977ce5a7fbe124870356149edabcf99e43e4b8d593953227988eb877e94` |
+| **Product X (Twitter) Profile** | [@ZeroPayZK](https://x.com/ZeroPayZK) |
 | **Demo Walkthrough Video** | Watch Demo on YouTube |
 
 ---
