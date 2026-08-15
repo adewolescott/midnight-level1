@@ -4,7 +4,7 @@
 [![Midnight Network](https://img.shields.io/badge/Midnight-Preprod%20Testnet-6366f1.svg)](https://midnight.network)
 [![X Profile](https://img.shields.io/badge/X-@ZeroPayZK-black.svg?logo=x)](https://x.com/ZeroPayZK)
 
-ZeroPay is a privacy-preserving payroll and fund distribution dApp built on the **Midnight Network** using **Compact** Zero-Knowledge (ZK) circuits and **Next.js**.
+ZeroPay is a privacy-preserving payroll and fund distribution dApp built on the Midnight Network using Compact Zero-Knowledge (ZK) circuits and Next.js.
 
 It enables Web3 organizations, DAOs, and global enterprises to execute verifiable, batch-funded payroll distributions without exposing employee salaries, private wallet addresses, or compensation structures on a public ledger.
 
@@ -14,16 +14,18 @@ It enables Web3 organizations, DAOs, and global enterprises to execute verifiabl
 
 | Resource | Link / Identifier |
 | :--- | :--- |
-| **Live Preprod dApp** | [https://zeropay-midnight.vercel.app](https://zeropay-midnight.vercel.app) |
-| **Preprod Contract Address** | `6f678977ce5a7fbe124870356149edabcf99e43e4b8d593953227988eb877e94` |
-| **Product X (Twitter) Profile** | [@ZeroPayZK](https://x.com/ZeroPayZK) |
-| **Demo Walkthrough Video** | [Watch Demo on YouTube](https://youtube.com) |
+| **Live Preprod dApp** | https://zeropay-midnight.vercel.app |
+| **Preprod Contract Address** | 6f678977ce5a7fbe124870356149edabcf99e43e4b8d593953227988eb877e94 |
+| **Product X (Twitter) Profile** | @ZeroPayZK |
+| **Demo Walkthrough Video** | Watch Demo on YouTube |
 
 ---
 
 ## 🏛 Architecture & Dual-State Privacy Model
 
-Traditional blockchains expose all financial payouts publicly. ZeroPay utilizes Midnight's dual-state computational model to decouple private execution from on-chain state verification:+-------------------------------------------------------------------------+
+Traditional blockchains expose all financial payouts publicly. ZeroPay utilizes Midnight's dual-state computational model to decouple private execution from on-chain state verification:
+
++-------------------------------------------------------------------------+
 |                       LOCAL CLIENT (Browser + Lace)                     |
 |                                                                         |
 |  [ Private Witness Inputs ]                                             |
@@ -36,9 +38,9 @@ Traditional blockchains expose all financial payouts publicly. ZeroPay utilizes 
 |  [ Compact Proof Engine ] ──► Computes: Nullifier = H(secretKey || ID)  |
 |                                Generates: ZK-Proof (valid membership)   |
 +------------------------------------+------------------------------------+
-│
-│ Submits Proof & Nullifier
-▼
+                                     │
+                                     │ Submits Proof & Nullifier
+                                     ▼
 +-------------------------------------------------------------------------+
 |                  MIDNIGHT PREPROD TESTNET (On-Chain)                    |
 |                                                                         |
@@ -52,6 +54,7 @@ Traditional blockchains expose all financial payouts publicly. ZeroPay utilizes 
 |  - Asserts !nullifierSet.member(nullifier)                              |
 |  - Decrements vaultTotal & inserts nullifier                            |
 +-------------------------------------------------------------------------+
+
 ### Observable Privacy Matrix
 
 | Property | Visibility | Location | Description |
@@ -65,12 +68,15 @@ Traditional blockchains expose all financial payouts publicly. ZeroPay utilizes 
 
 ---
 
-## 📂 Project Structure├── .github/
+## 📂 Project Structure
+
+├── .github/
 │   └── workflows/
 │       └── ci.yml             # Automated GitHub Actions test & build pipeline
 ├── contract/
 │   ├── src/
-│   │   └── zeropay.compact    # Compact smart contract defining circuits & state
+│   │   ├── zeropay.compact    # Compact smart contract defining circuits & state
+│   │   └── types.ts           # TypeScript circuit interfaces
 │   └── test/
 │       └── zeropay.test.ts    # Vitest unit test suite (proof, claims, nullifiers)
 ├── frontend/
@@ -83,16 +89,54 @@ Traditional blockchains expose all financial payouts publicly. ZeroPay utilizes 
 │   ├── package.json
 │   └── tsconfig.json
 └── README.md
+
 ---
 
 ## 🛠 Local Setup & Installation
 
 ### Prerequisites
-- Node.js `v20.x` or higher
-- npm `v10.x` or higher
-- [Midnight Lace Wallet Extension](https://midnight.network) configured for **Preprod Testnet**
+- Node.js v20.x or higher
+- npm v10.x or higher
+- Midnight Lace Wallet Extension configured for Preprod Testnet
 
 ### 1. Clone the Repository
-```bash
-git clone [https://github.com/adewolescott/midnight-level1.git](https://github.com/adewolescott/midnight-level1.git) zeropay
+git clone https://github.com/adewolescott/midnight-level1.git zeropay
 cd zeropay
+
+### 2. Install Dependencies
+cd frontend
+npm install --legacy-peer-deps
+
+### 3. Run Automated Circuit Tests
+npx vitest run
+
+### 4. Start Development Server
+npm run dev
+
+Open http://localhost:3000 in your browser to interact with the dApp.
+
+---
+
+## 🧪 Vitest Test Suite Coverage
+
+The contract test suite (contract/test/zeropay.test.ts) verifies the following operational criteria:
+
+1. Vault Initialization: Confirms batch deposits increment vaultTotal and store payoutRoot.
+2. Confidential Claim Verification: Validates that a valid private witness (secretKey, amount, proof) authorizes payment.
+3. Double-Claim Prevention: Asserts contract rejection when the same nullifier is submitted twice.
+4. Unauthorized Witness Rejection: Validates that altered secret keys or incorrect salary amounts fail circuit assertions.
+
+---
+
+## 📜 Smart Contract Circuits (zeropay.compact)
+
+* depositPayroll(depositAmount: Uint<64>, newPayoutRoot: Bytes<32>): Void
+  Locks batch payroll funds into vaultTotal and updates the active payoutRoot.
+
+* claimPayout(publicNullifier: Bytes<32>, payoutAmount: Uint<64>, witness secretKey: Bytes<32>, witness proof: Vector<4, Bytes<32>>, witness indices: Vector<4, Boolean>): Void
+  Verifies the private witness proof against payoutRoot, writes publicNullifier to nullifierSet, and debits payoutAmount from vaultTotal.
+
+---
+
+## 📄 License
+This project is licensed under the MIT License.
