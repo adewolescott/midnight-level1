@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "@midnight-ntwrk/compact-runtime": "^0.16.0"
+  }
+}

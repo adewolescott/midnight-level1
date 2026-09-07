@@ -1,101 +1,61 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-
-export interface DAppConnectorWalletAPI {
-  serviceUriConfig?: () => Promise<{
-    indexerUri?: string;
-    proverServerUri?: string;
-    substrateNodeUri?: string;
-  }>;
-  state?: () => Promise<unknown>;
-  balanceTx?: (tx: unknown, config?: unknown) => Promise<unknown>;
-  submitTx?: (tx: unknown) => Promise<string>;
-  [key: string]: unknown;
-}
+import { useState, useCallback } from 'react';
 
 export function useLaceWallet() {
-  const [walletApi, setWalletApi] = useState<DAppConnectorWalletAPI | null>(null);
+  const [walletApi, setWalletApi] = useState<any>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const checkConnection = useCallback(async () => {
-    try {
-      if (typeof window !== 'undefined' && (window as unknown as { midnight?: { mnLace?: unknown } }).midnight?.mnLace) {
-        const midnight = (window as unknown as {
-          midnight: {
-            mnLace: {
-              isEnabled: () => Promise<boolean>;
-              enable: () => Promise<DAppConnectorWalletAPI>;
-            };
-          };
-        }).midnight;
-
-        const isEnabled = await midnight.mnLace.isEnabled();
-        if (isEnabled) {
-          const api = await midnight.mnLace.enable();
-          setWalletApi(api);
-          setIsConnected(true);
-          setWalletAddress('mn_preprod1qz0pay...9zk');
-        }
-      }
-    } catch (err: unknown) {
-      console.warn('Lace auto-connect check:', err);
-    }
-  }, []);
-
-  useEffect(() => {
-    checkConnection();
-  }, [checkConnection]);
-
-  const connectWallet = async () => {
+  const connectWallet = useCallback(async () => {
     setIsConnecting(true);
     setError(null);
 
     try {
-      if (typeof window !== 'undefined' && (window as unknown as { midnight?: { mnLace?: unknown } }).midnight?.mnLace) {
-        const midnight = (window as unknown as {
-          midnight: {
-            mnLace: {
-              enable: () => Promise<DAppConnectorWalletAPI>;
-            };
-          };
-        }).midnight;
+      if (typeof window === 'undefined') return;
 
-        const api = await midnight.mnLace.enable();
-        setWalletApi(api);
-        setIsConnected(true);
-        setWalletAddress('mn_preprod1qz0pay...9zk');
-      } else {
-        // Fallback Preprod Testnet Session
-        setWalletApi({
-          state: async () => ({ network: 'preprod', status: 'connected' }),
-          submitTx: async () => '0x' + Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join(''),
-        });
-        setIsConnected(true);
-        setWalletAddress('mn_preprod1qz0pay_live...9zk');
+      const midnight = (window as any).midnight;
+      if (!midnight || !midnight.mnLace) {
+        throw new Error(
+          'Midnight Lace wallet extension not detected. Please install and enable Lace for Midnight Preprod.'
+        );
       }
-    } catch {
-      // Fallback on any extension permission block
-      setWalletApi({
-        state: async () => ({ network: 'preprod', status: 'connected' }),
-        submitTx: async () => '0x' + Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join(''),
-      });
+
+      const isEnabled = await midnight.mnLace.isEnabled();
+      const api = isEnabled
+        ? await midnight.mnLace.enable()
+        : await midnight.mnLace.enable();
+
+      if (!api) {
+        throw new Error('User declined wallet connection request.');
+      }
+
+      const state = await api.state();
+      const addr = state.address || state.shieldedAddress || state.unshieldedAddress;
+
+      setWalletApi(api);
+      setWalletAddress(addr);
       setIsConnected(true);
-      setWalletAddress('mn_preprod1qz0pay_live...9zk');
+    } catch (err: any) {
+      console.error('Wallet connection error:', err);
+      setError(err.message || 'Failed to connect to Midnight Lace');
+      setIsConnected(false);
+      setWalletApi(null);
+      setWalletAddress(null);
+      alert(err.message || 'Failed to connect to Midnight Lace');
     } finally {
       setIsConnecting(false);
     }
-  };
+  }, []);
 
-  const disconnectWallet = () => {
+  const disconnectWallet = useCallback(() => {
     setWalletApi(null);
     setWalletAddress(null);
     setIsConnected(false);
     setError(null);
-  };
+  }, []);
 
   return {
     walletApi,
