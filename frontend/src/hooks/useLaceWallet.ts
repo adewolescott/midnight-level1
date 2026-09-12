@@ -3,51 +3,72 @@
 import { useState, useCallback, useEffect } from 'react';
 
 /**
- * Enumerates window.midnight to discover wallets registered under UUID keys (CAIP-372 standard)
- * or legacy static keys (mnLace / lace).
+ * Probes all known injection locations for Midnight Lace:
+ * 1. window.midnight (both UUID entries and named properties)
+ * 2. window.cardano (lace, mnLace, or midnight entries)
+ * 3. window.midnightLace / window.mnLace global aliases
  */
-function findInjectedMidnightWallet(): any | null {
+function findMidnightProvider(): any | null {
   if (typeof window === 'undefined') return null;
 
-  const midnight = (window as any).midnight;
-  if (!midnight) {
-    // Also check window.cardano fallback
-    if ((window as any).cardano?.midnight) return (window as any).cardano.midnight;
-    return null;
+  const win = window as any;
+
+  // 1. Check window.midnight
+  if (win.midnight) {
+    if (win.midnight.mnLace) return win.midnight.mnLace;
+    if (win.midnight.lace) return win.midnight.lace;
+    
+    // CAIP-372 enumeration of UUID keys
+    const entries = Object.entries(win.midnight);
+    for (const [, val] of entries) {
+      if (val && typeof val === 'object') {
+        const candidate = val as any;
+        if (
+          candidate.enable ||
+          candidate.connect ||
+          candidate.name?.toLowerCase().includes('lace') ||
+          candidate.rdns?.toLowerCase().includes('lace')
+        ) {
+          return candidate;
+        }
+      }
+    }
+    if (entries.length > 0 && typeof entries[0][1] === 'object') {
+      return entries[0][1];
+    }
   }
 
-  // Check legacy direct properties first
-  if (midnight.mnLace) return midnight.mnLace;
-  if (midnight.lace) return midnight.lace;
+  // 2. Check window.cardano namespace (Standard CIP-30 injection)
+  if (win.cardano) {
+    if (win.cardano.lace?.enable || win.cardano.lace?.connect) return win.cardano.lace;
+    if (win.cardano.mnLace) return win.cardano.mnLace;
+    if (win.cardano.midnight) return win.cardano.midnight;
+    if (win.cardano['midnight-lace']) return win.cardano['midnight-lace'];
 
-  // CAIP-372 Standard: Enumerate UUID keys on window.midnight
-  const walletEntries = Object.values(midnight);
-  if (walletEntries.length > 0) {
-    // Find lace-specific wallet or take the first available Midnight wallet
-    const laceWallet = walletEntries.find((w: any) => 
-      w?.name?.toLowerCase().includes('lace') || 
-      w?.rdns?.toLowerCase().includes('lace')
-    );
-    return laceWallet || walletEntries[0];
+    for (const [key, val] of Object.entries(win.cardano)) {
+      if (key.toLowerCase().includes('lace') || key.toLowerCase().includes('midnight')) {
+        return val;
+      }
+    }
   }
+
+  // 3. Direct global aliases
+  if (win.mnLace) return win.mnLace;
+  if (win.midnightLace) return win.midnightLace;
 
   return null;
 }
 
-/**
- * Polls for the Midnight provider object if the browser extension
- * finishes injecting script tags after React's initial mount.
- */
-async function waitForMidnightWallet(timeoutMs = 4000): Promise<any> {
+async function waitForProvider(maxWaitMs = 5000): Promise<any> {
   const startTime = Date.now();
 
-  while (Date.now() - startTime < timeoutMs) {
-    const wallet = findInjectedMidnightWallet();
-    if (wallet) return wallet;
-    await new Promise((resolve) => setTimeout(resolve, 150));
+  while (Date.now() - startTime < maxWaitMs) {
+    const provider = findMidnightProvider();
+    if (provider) return provider;
+    await new Promise((r) => setTimeout(r, 200));
   }
 
-  return findInjectedMidnightWallet();
+  return findMidnightProvider();
 }
 
 export function useLaceWallet() {
@@ -58,20 +79,32 @@ export function useLaceWallet() {
   const [error, setError] = useState<string | null>(null);
   const [isLaceDetected, setIsLaceDetected] = useState<boolean>(false);
 
-  // Probe for extension on mount
+  // Monitor DOM injection and event notifications
   useEffect(() => {
-    let mounted = true;
+    let active = true;
 
-    async function detect() {
-      const provider = await waitForMidnightWallet(2500);
-      if (mounted && provider) {
+    const checkProvider = () => {
+      const p = findMidnightProvider();
+      if (p && active) {
         setIsLaceDetected(true);
       }
-    }
+    };
 
-    detect();
+    checkProvider();
+
+    // Listen for custom wallet announcement events
+    window.addEventListener('midnight#initialized', checkProvider);
+    window.addEventListener('cardano#initialized', checkProvider);
+    window.addEventListener('load', checkProvider);
+
+    const interval = setInterval(checkProvider, 500);
+
     return () => {
-      mounted = false;
+      active = false;
+      window.removeEventListener('midnight#initialized', checkProvider);
+      window.removeEventListener('cardano#initialized', checkProvider);
+      window.removeEventListener('load', checkProvider);
+      clearInterval(interval);
     };
   }, []);
 
@@ -81,61 +114,69 @@ export function useLaceWallet() {
 
     try {
       if (typeof window === 'undefined') {
-        throw new Error('Window environment unavailable.');
+        throw new Error('Browser window environment not found.');
       }
 
-      // Resolve provider via UUID enumeration & polling
-      const walletProvider = await waitForMidnightWallet(4500);
+      // Debug diagnostics in browser console
+      const win = window as any;
+      console.log('Window environment inspection:', {
+        hasMidnight: !!win.midnight,
+        midnightKeys: win.midnight ? Object.keys(win.midnight) : [],
+        hasCardano: !!win.cardano,
+        cardanoKeys: win.cardano ? Object.keys(win.cardano) : [],
+      });
 
-      if (!walletProvider) {
+      const provider = await waitForProvider(4500);
+
+      if (!provider) {
         throw new Error(
-          'Midnight Lace wallet extension was not detected. Please ensure Midnight Lace is installed, enabled, and unlocked in your browser.'
+          'Midnight Lace wallet extension was not detected. Please make sure the Lace extension is unlocked and set to Midnight Preprod, then reload the page.'
         );
       }
 
       setIsLaceDetected(true);
 
-      // Establish connection: Support connect('preprod') [CAIP-372] or enable() [CIP-30]
+      // Authenticate via either connect() or enable()
       let api: any = null;
-      if (typeof walletProvider.connect === 'function') {
+      if (typeof provider.connect === 'function') {
         try {
-          api = await walletProvider.connect('preprod');
-        } catch (connErr) {
-          api = await walletProvider.connect();
+          api = await provider.connect('preprod');
+        } catch {
+          api = await provider.connect();
         }
-      } else if (typeof walletProvider.enable === 'function') {
-        api = await walletProvider.enable();
-      } else if (typeof walletProvider.isEnabled === 'function') {
-        const enabled = await walletProvider.isEnabled();
-        api = enabled ? await walletProvider.enable() : await walletProvider.enable();
+      } else if (typeof provider.enable === 'function') {
+        api = await provider.enable();
+      } else if (typeof provider.isEnabled === 'function') {
+        const isEnabled = await provider.isEnabled();
+        api = isEnabled ? await provider.enable() : await provider.enable();
       } else {
-        api = walletProvider;
+        api = provider;
       }
 
       if (!api) {
-        throw new Error('Connection request was declined or returned an empty API session.');
+        throw new Error('Connection request was declined by the user in Lace.');
       }
 
-      // Query account/state across all DApp connector specs
-      let address: string | null = null;
+      // Resolve address across API schemas
+      let addr: string | null = null;
       if (typeof api.getUnshieldedAddress === 'function') {
-        address = await api.getUnshieldedAddress();
+        addr = await api.getUnshieldedAddress();
       } else if (typeof api.state === 'function') {
-        const state = await api.state();
-        address = state?.address || state?.shieldedAddress || state?.unshieldedAddress || null;
-      } else if (typeof api.getDustAddress === 'function') {
-        address = await api.getDustAddress();
+        const s = await api.state();
+        addr = s?.address || s?.shieldedAddress || s?.unshieldedAddress || null;
       } else if (typeof api.getUsedAddresses === 'function') {
         const addrs = await api.getUsedAddresses();
-        address = addrs?.[0] || null;
+        addr = addrs?.[0] || null;
+      } else if (typeof api.getChangeAddress === 'function') {
+        addr = await api.getChangeAddress();
       }
 
       setWalletApi(api);
-      setWalletAddress(address || 'Connected (Midnight Lace)');
+      setWalletAddress(addr || 'Connected (Midnight Lace)');
       setIsConnected(true);
     } catch (err: any) {
-      console.error('Wallet connection error:', err);
-      const msg = err.message || 'Failed to connect to Midnight Lace';
+      console.error('Lace Connection Error:', err);
+      const msg = err.message || 'Failed to connect to Midnight Lace.';
       setError(msg);
       setIsConnected(false);
       setWalletApi(null);
