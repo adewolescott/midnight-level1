@@ -3,26 +3,51 @@
 import { useState, useCallback, useEffect } from 'react';
 
 /**
- * Polls for the Midnight Lace provider object if the browser extension
+ * Enumerates window.midnight to discover wallets registered under UUID keys (CAIP-372 standard)
+ * or legacy static keys (mnLace / lace).
+ */
+function findInjectedMidnightWallet(): any | null {
+  if (typeof window === 'undefined') return null;
+
+  const midnight = (window as any).midnight;
+  if (!midnight) {
+    // Also check window.cardano fallback
+    if ((window as any).cardano?.midnight) return (window as any).cardano.midnight;
+    return null;
+  }
+
+  // Check legacy direct properties first
+  if (midnight.mnLace) return midnight.mnLace;
+  if (midnight.lace) return midnight.lace;
+
+  // CAIP-372 Standard: Enumerate UUID keys on window.midnight
+  const walletEntries = Object.values(midnight);
+  if (walletEntries.length > 0) {
+    // Find lace-specific wallet or take the first available Midnight wallet
+    const laceWallet = walletEntries.find((w: any) => 
+      w?.name?.toLowerCase().includes('lace') || 
+      w?.rdns?.toLowerCase().includes('lace')
+    );
+    return laceWallet || walletEntries[0];
+  }
+
+  return null;
+}
+
+/**
+ * Polls for the Midnight provider object if the browser extension
  * finishes injecting script tags after React's initial mount.
  */
-async function getMidnightLaceProvider(timeoutMs = 3500): Promise<any> {
+async function waitForMidnightWallet(timeoutMs = 4000): Promise<any> {
   const startTime = Date.now();
 
   while (Date.now() - startTime < timeoutMs) {
-    if (typeof window !== 'undefined') {
-      const midnight = (window as any).midnight;
-      if (midnight?.mnLace) return midnight.mnLace;
-      if (midnight?.lace) return midnight.lace;
-      // Fallback for standard CIP wallet registry
-      if ((window as any).cardano?.midnight) return (window as any).cardano.midnight;
-    }
+    const wallet = findInjectedMidnightWallet();
+    if (wallet) return wallet;
     await new Promise((resolve) => setTimeout(resolve, 150));
   }
 
-  // Final check
-  const midnight = typeof window !== 'undefined' ? (window as any).midnight : undefined;
-  return midnight?.mnLace || midnight?.lace || null;
+  return findInjectedMidnightWallet();
 }
 
 export function useLaceWallet() {
@@ -38,7 +63,7 @@ export function useLaceWallet() {
     let mounted = true;
 
     async function detect() {
-      const provider = await getMidnightLaceProvider(2000);
+      const provider = await waitForMidnightWallet(2500);
       if (mounted && provider) {
         setIsLaceDetected(true);
       }
@@ -59,10 +84,10 @@ export function useLaceWallet() {
         throw new Error('Window environment unavailable.');
       }
 
-      // Resolve provider with dynamic wait
-      const laceProvider = await getMidnightLaceProvider(4000);
+      // Resolve provider via UUID enumeration & polling
+      const walletProvider = await waitForMidnightWallet(4500);
 
-      if (!laceProvider) {
+      if (!walletProvider) {
         throw new Error(
           'Midnight Lace wallet extension was not detected. Please ensure Midnight Lace is installed, enabled, and unlocked in your browser.'
         );
@@ -70,33 +95,37 @@ export function useLaceWallet() {
 
       setIsLaceDetected(true);
 
-      // Check authorization state
-      let api: any;
-      if (typeof laceProvider.isEnabled === 'function') {
-        const enabled = await laceProvider.isEnabled();
-        api = enabled ? await laceProvider.enable() : await laceProvider.enable();
-      } else if (typeof laceProvider.enable === 'function') {
-        api = await laceProvider.enable();
+      // Establish connection: Support connect('preprod') [CAIP-372] or enable() [CIP-30]
+      let api: any = null;
+      if (typeof walletProvider.connect === 'function') {
+        try {
+          api = await walletProvider.connect('preprod');
+        } catch (connErr) {
+          api = await walletProvider.connect();
+        }
+      } else if (typeof walletProvider.enable === 'function') {
+        api = await walletProvider.enable();
+      } else if (typeof walletProvider.isEnabled === 'function') {
+        const enabled = await walletProvider.isEnabled();
+        api = enabled ? await walletProvider.enable() : await walletProvider.enable();
       } else {
-        api = laceProvider;
+        api = walletProvider;
       }
 
       if (!api) {
         throw new Error('Connection request was declined or returned an empty API session.');
       }
 
-      // Query account/state
+      // Query account/state across all DApp connector specs
       let address: string | null = null;
-      if (typeof api.state === 'function') {
+      if (typeof api.getUnshieldedAddress === 'function') {
+        address = await api.getUnshieldedAddress();
+      } else if (typeof api.state === 'function') {
         const state = await api.state();
         address = state?.address || state?.shieldedAddress || state?.unshieldedAddress || null;
-      } else if (typeof api.getUnshieldedAddress === 'function') {
-        address = await api.getUnshieldedAddress();
-      } else if (typeof api.getChangeAddress === 'function') {
-        address = await api.getChangeAddress();
-      }
-
-      if (!address && typeof api.getUsedAddresses === 'function') {
+      } else if (typeof api.getDustAddress === 'function') {
+        address = await api.getDustAddress();
+      } else if (typeof api.getUsedAddresses === 'function') {
         const addrs = await api.getUsedAddresses();
         address = addrs?.[0] || null;
       }
