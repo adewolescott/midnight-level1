@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 export function useLaceWallet() {
-  const [walletApi, setWalletApi] = useState<any>(null);
+  const walletApiRef = useRef<any>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [connectedWalletName, setConnectedWalletName] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -15,101 +15,100 @@ export function useLaceWallet() {
     setError(null);
 
     try {
-      if (typeof window === 'undefined') {
-        throw new Error('Window not found');
-      }
+      if (typeof window === 'undefined') return;
 
       const win = window as any;
-      let provider: any = null;
-      let walletName = 'Midnight Wallet';
+      let targetProvider: any = null;
+      let name = 'Midnight Wallet';
 
-      // 1. Check 1am wallet
+      // 1. Check 1am Wallet
       if (win.oneam) {
-        provider = win.oneam;
-        walletName = '1am Wallet';
+        targetProvider = win.oneam;
+        name = '1am Wallet';
       } else if (win.midnight?.['1am']) {
-        provider = win.midnight['1am'];
-        walletName = '1am Wallet';
+        targetProvider = win.midnight['1am'];
+        name = '1am Wallet';
       } 
       // 2. Check Midnight Lace
       else if (win.midnight?.mnLace) {
-        provider = win.midnight.mnLace;
-        walletName = 'Midnight Lace';
+        targetProvider = win.midnight.mnLace;
+        name = 'Midnight Lace';
       } else if (win.midnight?.lace) {
-        provider = win.midnight.lace;
-        walletName = 'Midnight Lace';
+        targetProvider = win.midnight.lace;
+        name = 'Midnight Lace';
       } 
-      // 3. Fallback: enumerate any key under window.midnight
-      else if (win.midnight && Object.keys(win.midnight).length > 0) {
-        const values = Object.values(win.midnight) as any[];
-        provider = values.find((v) => v && (typeof v.connect === 'function' || typeof v.enable === 'function')) || values[0];
-        if (provider) walletName = provider.name || 'Midnight Wallet';
+      // 3. Fallback to any enumerated provider
+      else if (win.midnight && typeof win.midnight === 'object') {
+        const vals = Object.values(win.midnight) as any[];
+        const found = vals.find((v) => v && (typeof v.connect === 'function' || typeof v.enable === 'function'));
+        if (found) {
+          targetProvider = found;
+          name = found.name || 'Midnight Wallet';
+        }
       } 
-      // 4. Cardano fallback
+      // 4. Cardano namespace fallback
       else if (win.cardano?.lace) {
-        provider = win.cardano.lace;
-        walletName = 'Lace';
+        targetProvider = win.cardano.lace;
+        name = 'Lace';
       }
 
-      if (!provider) {
-        throw new Error('No Midnight-compatible wallet found. Please make sure 1am Wallet or Lace is installed and unlocked.');
+      if (!targetProvider) {
+        throw new Error('No Midnight-compatible wallet detected. Please install or unlock 1am Wallet or Midnight Lace.');
       }
 
-      // Handshake with timeout
-      let api: any = null;
-      try {
-        if (typeof provider.connect === 'function') {
-          api = await Promise.race([
-            provider.connect('preprod').catch(() => provider.connect()),
-            new Promise((_, r) => setTimeout(() => r(new Error('Handshake timeout')), 7000))
-          ]);
-        } else if (typeof provider.enable === 'function') {
-          api = await Promise.race([
-            provider.enable(),
-            new Promise((_, r) => setTimeout(() => r(new Error('Handshake timeout')), 7000))
-          ]);
-        } else {
-          api = provider;
+      // Safe connection handshake
+      let session: any = null;
+      if (typeof targetProvider.connect === 'function') {
+        try {
+          session = await targetProvider.connect('preprod');
+        } catch {
+          session = await targetProvider.connect();
         }
-      } catch (handshakeErr: any) {
-        throw new Error(handshakeErr?.message || 'Wallet connection was rejected or timed out.');
+      } else if (typeof targetProvider.enable === 'function') {
+        session = await targetProvider.enable();
+      } else {
+        session = targetProvider;
       }
 
-      if (!api) {
-        throw new Error('Connection declined.');
+      if (!session) {
+        throw new Error('Connection request was declined.');
       }
 
-      // Extract address safely
-      let addr: string | null = null;
+      // Store API in ref to avoid React state re-render crashes with Proxy objects
+      walletApiRef.current = session;
+
+      // Safely extract address string
+      let addrStr = `${name} Connected`;
       try {
-        if (typeof api.getUnshieldedAddress === 'function') {
-          addr = await api.getUnshieldedAddress();
-        } else if (typeof api.getDustAddress === 'function') {
-          addr = await api.getDustAddress();
-        } else if (typeof api.state === 'function') {
-          const s = await api.state();
-          addr = s?.address || s?.unshieldedAddress || null;
+        if (typeof session.getUnshieldedAddress === 'function') {
+          const uAddr = await session.getUnshieldedAddress();
+          if (uAddr) addrStr = String(uAddr);
+        } else if (typeof session.getDustAddress === 'function') {
+          const dAddr = await session.getDustAddress();
+          if (dAddr) addrStr = String(dAddr);
+        } else if (typeof session.state === 'function') {
+          const st = await session.state();
+          if (st?.address) addrStr = String(st.address);
+          else if (st?.unshieldedAddress) addrStr = String(st.unshieldedAddress);
         }
-      } catch (addrErr) {
-        console.warn('Could not read address from API:', addrErr);
+      } catch (err) {
+        console.warn('Address extraction warning:', err);
       }
 
-      setWalletApi(api);
-      setConnectedWalletName(walletName);
-      setWalletAddress(addr || `Connected (${walletName})`);
+      setConnectedWalletName(name);
+      setWalletAddress(addrStr);
       setIsConnected(true);
     } catch (err: any) {
-      console.error('Wallet connect error:', err);
-      const msg = err?.message || 'Failed to connect wallet';
-      setError(msg);
-      // alert removed
+      console.error('Connection error:', err);
+      setError(err?.message || 'Failed to connect wallet');
+      setIsConnected(false);
     } finally {
       setIsConnecting(false);
     }
   }, []);
 
   const disconnectWallet = useCallback(() => {
-    setWalletApi(null);
+    walletApiRef.current = null;
     setWalletAddress(null);
     setConnectedWalletName(null);
     setIsConnected(false);
@@ -117,7 +116,7 @@ export function useLaceWallet() {
   }, []);
 
   return {
-    walletApi,
+    walletApi: walletApiRef.current,
     walletAddress,
     connectedWalletName,
     isConnected,
