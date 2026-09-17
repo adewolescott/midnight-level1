@@ -102,7 +102,7 @@ export function useLaceWallet() {
       console.error('Wallet connect error:', err);
       const msg = err?.message || 'Failed to connect wallet';
       setError(msg);
-      alert(msg);
+      // alert removed
     } finally {
       setIsConnecting(false);
     }

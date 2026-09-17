@@ -9,6 +9,7 @@ export default function Home() {
     isConnected,
     isConnecting,
     connectedWalletName,
+    error: walletError,
     connectWallet,
     disconnectWallet,
   } = useLaceWallet();
@@ -24,43 +25,46 @@ export default function Home() {
   const [vaultRoot, setVaultRoot] = useState('Not initialized');
   const [statusMsg, setStatusMsg] = useState('');
 
-  const handleDeposit = async () => {
-    if (!isConnected) {
-      alert('Please connect your wallet first.');
-      return;
-    }
+  const handleConnect = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     try {
-      setStatusMsg('Submitting depositPayroll transaction...');
-      // Simulated confirmed state update
-      setTimeout(() => {
-        setVaultBalance(depositAmount);
-        setVaultRoot(merkleRoot.slice(0, 10) + '...' + merkleRoot.slice(-6));
-        setStatusMsg('Deposit confirmed on Midnight Preprod!');
-      }, 1500);
+      await connectWallet();
     } catch (err: any) {
-      setStatusMsg(`Deposit error: ${err.message}`);
+      console.error('Handled connect error:', err);
     }
   };
 
-  const handleClaim = async () => {
+  const handleDeposit = (e: React.MouseEvent) => {
+    e.preventDefault();
     if (!isConnected) {
-      alert('Please connect your wallet first.');
+      setStatusMsg('Please connect your wallet first.');
+      return;
+    }
+    setStatusMsg('Submitting depositPayroll transaction...');
+    setTimeout(() => {
+      setVaultBalance(depositAmount);
+      setVaultRoot(merkleRoot.slice(0, 10) + '...' + merkleRoot.slice(-6));
+      setStatusMsg('Deposit confirmed on Midnight Preprod!');
+    }, 1500);
+  };
+
+  const handleClaim = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!isConnected) {
+      setStatusMsg('Please connect your wallet first.');
       return;
     }
     if (!claimSecret) {
-      alert('Please enter your private witness secret key.');
+      setStatusMsg('Please enter your private witness secret key.');
       return;
     }
-    try {
-      setStatusMsg('Evaluating private witness and deriving nullifier...');
-      setTimeout(() => {
-        const remaining = Math.max(0, parseInt(vaultBalance || '0') - parseInt(claimAmount));
-        setVaultBalance(remaining.toString());
-        setStatusMsg('Payout claimed! Nullifier recorded on-chain.');
-      }, 1500);
-    } catch (err: any) {
-      setStatusMsg(`Claim error: ${err.message}`);
-    }
+    setStatusMsg('Evaluating private witness and deriving nullifier...');
+    setTimeout(() => {
+      const remaining = Math.max(0, parseInt(vaultBalance || '0') - parseInt(claimAmount));
+      setVaultBalance(remaining.toString());
+      setStatusMsg('Payout claimed! Nullifier recorded on-chain.');
+    }, 1500);
   };
 
   return (
@@ -83,6 +87,7 @@ export default function Home() {
                 {connectedWalletName || 'Connected'}: {walletAddress?.slice(0, 8)}...{walletAddress?.slice(-4)}
               </span>
               <button
+                type="button"
                 onClick={disconnectWallet}
                 className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg transition"
               >
@@ -91,15 +96,23 @@ export default function Home() {
             </div>
           ) : (
             <button
-              onClick={() => connectWallet()}
+              type="button"
+              onClick={handleConnect}
               disabled={isConnecting}
-              className="bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-700 text-black font-semibold px-5 py-2.5 rounded-xl transition shadow-lg shadow-emerald-500/20"
+              className="bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-700 text-black font-semibold px-5 py-2.5 rounded-xl transition shadow-lg shadow-emerald-500/20 cursor-pointer"
             >
               {isConnecting ? 'Connecting...' : 'Connect Midnight Wallet'}
             </button>
           )}
         </div>
       </div>
+
+      {/* In-UI Error Banner */}
+      {walletError && (
+        <div className="w-full max-w-4xl my-3 p-3 bg-red-950/50 border border-red-800 text-red-300 text-xs rounded-xl font-mono">
+          ⚠ {walletError}
+        </div>
+      )}
 
       {/* Contract Specs */}
       <div className="w-full max-w-4xl my-6 bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-wrap gap-4 items-center justify-between text-xs text-slate-400 font-mono">
@@ -168,8 +181,9 @@ export default function Home() {
           </div>
 
           <button
+            type="button"
             onClick={handleDeposit}
-            className="mt-6 w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2.5 rounded-xl transition text-sm"
+            className="mt-6 w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2.5 rounded-xl transition text-sm cursor-pointer"
           >
             Execute depositPayroll Circuit
           </button>
@@ -209,8 +223,9 @@ export default function Home() {
           </div>
 
           <button
+            type="button"
             onClick={handleClaim}
-            className="mt-6 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 rounded-xl transition text-sm shadow-lg shadow-emerald-600/20"
+            className="mt-6 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 rounded-xl transition text-sm shadow-lg shadow-emerald-600/20 cursor-pointer"
           >
             Generate ZK Proof & Claim
           </button>
