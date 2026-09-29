@@ -17,7 +17,7 @@ It enables Web3 organizations, DAOs, and global enterprises to execute verifiabl
 | **Live Preprod dApp** | https://zeropay-midnight.vercel.app |
 | **Preprod Contract Address** | `6f678977ce5a7fbe124870356149edabcf99e43e4b8d593953227988eb877e94` |
 | **Product X (Twitter) Profile** | [@ZeroPayZK](https://x.com/ZeroPayZK) |
-| **Demo Walkthrough Video** | Watch Demo on YouTube |
+| **Demo Walkthrough Video** | (https://youtu.be/MzkQRAGOezo) |
 
 ---
 
